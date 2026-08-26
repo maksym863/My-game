@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Bear Adventure</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  overflow:hidden;
+  background:#7bdcff;
+  font-family:Arial,sans-serif;
+  touch-action:none;
+}
+canvas{
+  display:block;
+  width:100vw;
+  height:100vh;
+}
+#ui{
+  position:fixed;
+  top:10px;
+  left:10px;
+  color:white;
+  font-size:20px;
+  font-weight:bold;
+  text-shadow:2px 2px 3px #333;
+}
+#buttons{
+  position:fixed;
+  bottom:20px;
+  left:0;
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  padding:0 20px;
+}
+.group{display:flex;gap:12px}
+button{
+  width:70px;
+  height:70px;
+  border:0;
+  border-radius:50%;
+  background:#ffffffaa;
+  font-size:30px;
+  font-weight:bold;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="ui">
+🪙 Монети: <span id="coins">0</span>
+❤️ Життя: <span id="lives">3</span>
+</div>
+
+<div id="buttons">
+  <div class="group">
+    <button id="left">⬅️</button>
+    <button id="right">➡️</button>
+  </div>
+  <button id="jump">⬆️</button>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+function resize(){
+  canvas.width=innerWidth;
+  canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
+
+let keys={left:false,right:false};
+let coins=0;
+let lives=3;
+
+const bear={
+ x:150,y:300,w:55,h:65,
+ vx:0,vy:0,
+ speed:5,
+ jump:14,
+ onGround:false
+};
+
+let camera=0;
+
+const platforms=[
+ {x:0,y:450,w:900,h:100},
+ {x:1050,y:390,w:450,h:160},
+ {x:1600,y:460,w:700,h:90},
+ {x:2450,y:370,w:600,h:180},
+ {x:3200,y:450,w:900,h:100}
+];
+
+const coinList=[
+ {x:300,y:390},{x:500,y:350},{x:750,y:400},
+ {x:1150,y:330},{x:1300,y:330},
+ {x:1750,y:400},{x:1950,y:400},
+ {x:2550,y:310},{x:2800,y:310},
+ {x:3400,y:390},{x:3700,y:390}
+];
+
+const enemies=[
+ {x:650,y:410,w:45,h:40,vx:2},
+ {x:1250,y:350,w:45,h:40,vx:2},
+ {x:1900,y:420,w:45,h:40,vx:-2},
+ {x:2700,y:330,w:45,h:40,vx:2},
+ {x:3500,y:410,w:45,h:40,vx:-2}
+];
+
+function rectHit(a,b){
+ return a.x<b.x+b.w &&
+        a.x+a.w>b.x &&
+        a.y<b.y+b.h &&
+        a.y+a.h>b.y;
+}
+
+function update(){
+  if(keys.left) bear.vx=-bear.speed;
+  else if(keys.right) bear.vx=bear.speed;
+  else bear.vx*=0.8;
+
+  bear.vy+=0.7;
+
+  bear.x+=bear.vx;
+  bear.y+=bear.vy;
+
+  bear.onGround=false;
+
+  for(const p of platforms){
+    if(
+      bear.x+bear.w>p.x &&
+      bear.x<p.x+p.w &&
+      bear.y+bear.h>p.y &&
+      bear.y+bear.h<p.y+30 &&
+      bear.vy>=0
+    ){
+      bear.y=p.y-bear.h;
+      bear.vy=0;
+      bear.onGround=true;
+    }
+  }
+
+  if(bear.y>canvas.height+300){
+    loseLife();
+  }
+
+  for(const c of coinList){
+    if(!c.taken &&
+       bear.x<c.x+20 &&
+       bear.x+bear.w>c.x-20 &&
+       bear.y<c.y+20 &&
+       bear.y+bear.h>c.y-20){
+      c.taken=true;
+      coins++;
+      document.getElementById("coins").textContent=coins;
+    }
+  }
+
+  for(const e of enemies){
+    e.x+=e.vx;
+
+    if(Math.abs(e.x-bear.x)<250) {
+      e.vx=bear.x<e.x?-2:2;
+    }
+
+    if(rectHit(bear,e)){
+      if(bear.vy>2 && bear.y+bear.h<e.y+20){
+        e.dead=true;
+        bear.vy=-8;
+      }else{
+        loseLife();
+      }
+    }
+  }
+
+  camera=bear.x-canvas.width*0.35;
+  if(camera<0)camera=0;
+}
+
+function loseLife(){
+  lives--;
+  document.getElementById("lives").textContent=lives;
+
+  if(lives<=0){
+    alert("Гру закінчено! 😭");
+    location.reload();
+  }else{
+    bear.x=150;
+    bear.y=250;
+    bear.vx=0;
+    bear.vy=0;
+  }
+}
+
+function drawBackground(){
+  ctx.fillStyle="#72d9ff";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // сонце
+  ctx.fillStyle="#ffe66d";
+  ctx.beginPath();
+  ctx.arc(100,100,50,0,Math.PI*2);
+  ctx.fill();
+
+  // гори
+  ctx.fillStyle="#75b96b";
+  for(let x=-500;x<5000;x+=500){
+    ctx.beginPath();
+    ctx.moveTo(x-camera*0.25,450);
+    ctx.lineTo(x+250-camera*0.25,180);
+    ctx.lineTo(x+500-camera*0.25,450);
+    ctx.fill();
+  }
+
+  // дерева
+  for(let x=100;x<5000;x+=300){
+    let sx=x-camera;
+    if(sx>-100&&sx<canvas.width+100){
+      ctx.fillStyle="#75452a";
+      ctx.fillRect(sx,330,30,120);
+
+      ctx.fillStyle="#299447";
+      ctx.beginPath();
+      ctx.arc(sx+15,310,65,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawPlatforms(){
+  for(const p of platforms){
+    ctx.fillStyle="#62a83f";
+    ctx.fillRect(p.x-camera,p.y,p.w,p.h);
+
+    ctx.fillStyle="#4b8c32";
+    ctx.fillRect(p.x-camera,p.y+20,p.w,p.h);
+  }
+}
+
+function drawCoins(){
+  for(const c of coinList){
+    if(c.taken)continue;
+
+    ctx.fillStyle="#ffd92f";
+    ctx.beginPath();
+    ctx.arc(c.x-camera,c.y,13,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle="#fff176";
+    ctx.beginPath();
+    ctx.arc(c.x-camera-4,c.y-4,4,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawEnemies(){
+  for(const e of enemies){
+    if(e.dead)continue;
+
+    let x=e.x-camera;
+
+    ctx.fillStyle="#d94b42";
+    ctx.fillRect(x,e.y,e.w,e.h);
+
+    ctx.fillStyle="white";
+    ctx.beginPath();
+    ctx.arc(x+13,e.y+13,7,0,Math.PI*2);
+    ctx.arc(x+32,e.y+13,7,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle="black";
+    ctx.beginPath();
+    ctx.arc(x+13,e.y+13,3,0,Math.PI*2);
+    ctx.arc(x+32,e.y+13,3,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawBear(){
+  let x=bear.x-camera;
+  let y=bear.y;
+
+  // тіло
+  ctx.fillStyle="#8b5a35";
+  ctx.fillRect(x+8,y+20,40,42);
+
+  // голова
+  ctx.beginPath();
+  ctx.arc(x+28,y+20,25,0,Math.PI*2);
+  ctx.fill();
+
+  // вуха
+  ctx.beginPath();
+  ctx.arc(x+10,y+2,10,0,Math.PI*2);
+  ctx.arc(x+46,y+2,10,0,Math.PI*2);
+  ctx.fill();
+
+  // очі
+  ctx.fillStyle="black";
+  ctx.beginPath();
+  ctx.arc(x+20,y+18,4,0,Math.PI*2);
+  ctx.arc(x+36,y+18,4,0,Math.PI*2);
+  ctx.fill();
+
+  // мордочка
+  ctx.fillStyle="#d39b6a";
+  ctx.beginPath();
+  ctx.arc(x+28,y+29,10,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="black";
+  ctx.beginPath();
+  ctx.arc(x+28,y+27,3,0,Math.PI*2);
+  ctx.fill();
+
+  // лапи
+  ctx.fillStyle="#6f452a";
+  ctx.fillRect(x,y+52,12,18);
+  ctx.fillRect(x+44,y+52,12,18);
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  drawBackground();
+  drawPlatforms();
+  drawCoins();
+  drawEnemies();
+  drawBear();
+
+  // фініш
+  if(bear.x>4000){
+    ctx.fillStyle="white";
+    ctx.font="bold 45px Arial";
+    ctx.fillText("🎉 ТИ ПЕРЕМІГ!",canvas.width/2-180,150);
+  }
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function jump(){
+  if(bear.onGround){
+    bear.vy=-bear.jump;
+  }
+}
+
+document.getElementById("left").ontouchstart=()=>keys.left=true;
+document.getElementById("left").ontouchend=()=>keys.left=false;
+
+document.getElementById("right").ontouchstart=()=>keys.right=true;
+document.getElementById("right").ontouchend=()=>keys.right=false;
+
+document.getElementById("jump").ontouchstart=jump;
+
+addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft"||e.key==="a")keys.left=true;
+  if(e.key==="ArrowRight"||e.key==="d")keys.right=true;
+  if(e.key==="ArrowUp"||e.key===" "||e.key==="w")jump();
+});
+
+addEventListener("keyup",e=>{
+  if(e.key==="ArrowLeft"||e.key==="a")keys.left=false;
+  if(e.key==="ArrowRight"||e.key==="d")keys.right=false;
+});
+
+loop();
+</script>
+
+</body>
+</html>    
+</html>    
